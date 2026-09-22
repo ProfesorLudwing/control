@@ -24,7 +24,6 @@ st.set_page_config(
 # ============================================================
 
 def get_grupos():
-    """Devuelve la lista de grupos ordenados por nombre."""
     s = SessionLocal()
     try:
         return s.query(Grupo).order_by(Grupo.nombre).all()
@@ -33,10 +32,6 @@ def get_grupos():
 
 
 def get_temas_con_progreso(grupo_id):
-    """
-    Devuelve una lista de dicts simples (no objetos ORM) con:
-    {tema_id, orden, web, titulo, estado}
-    """
     s = SessionLocal()
     try:
         filas = (
@@ -53,6 +48,8 @@ def get_temas_con_progreso(grupo_id):
                 "web": t.web_nombre,
                 "titulo": t.titulo,
                 "estado": p.estado,
+                "resumen_clase": p.resumen_clase,
+                "tarea_asignada": p.tarea_asignada,
             }
             for t, p in filas
         ]
@@ -61,16 +58,23 @@ def get_temas_con_progreso(grupo_id):
 
 
 def actualizar_estado(grupo_id, tema_id, nuevo_estado):
-    """Actualiza el estado de un tema para un grupo."""
     s = SessionLocal()
     try:
-        p = (
-            s.query(Progreso)
-            .filter_by(grupo_id=grupo_id, tema_id=tema_id)
-            .first()
-        )
+        p = s.query(Progreso).filter_by(grupo_id=grupo_id, tema_id=tema_id).first()
         if p:
             p.estado = nuevo_estado
+            s.commit()
+    finally:
+        s.close()
+
+
+def toggle_subactividad(grupo_id, tema_id, campo):
+    """Alterna True/False en resumen_clase o tarea_asignada."""
+    s = SessionLocal()
+    try:
+        p = s.query(Progreso).filter_by(grupo_id=grupo_id, tema_id=tema_id).first()
+        if p:
+            setattr(p, campo, not getattr(p, campo))
             s.commit()
     finally:
         s.close()
@@ -134,7 +138,6 @@ for t in temas:
     estado = t["estado"]
     es_siguiente = siguiente and t["tema_id"] == siguiente["tema_id"]
 
-    # Color y etiqueta según estado
     if estado == "visto_presencial":
         bg, color_texto, etiqueta = "#28a745", "white", "VISTO EN CLASE"
     elif estado == "visto_auto":
@@ -144,7 +147,7 @@ for t in temas:
     else:
         bg, color_texto, etiqueta = "#E0E0E0", "#555", "PENDIENTE"
 
-    # Cuatro columnas: título grande + 3 botones
+    # --- Fila 1: título + botones principales ---
     c_titulo, c_clase, c_auto, c_reset = st.columns([6, 1, 1, 1])
 
     with c_titulo:
@@ -183,7 +186,40 @@ for t in temas:
             key=f"reset_{t['tema_id']}",
             use_container_width=True,
             disabled=(estado == "pendiente"),
-            help="Regresar a pendiente",
+            help="Regresar a pendiente (conserva subactividades)",
         ):
             actualizar_estado(grupo.id, t["tema_id"], "pendiente")
             st.rerun()
+
+    # --- Fila 2: subactividades (solo si el tema está visto) ---
+    if estado != "pendiente":
+        c1, c2, c3, c4 = st.columns([6, 1, 1, 1])
+
+        # Columna 1 vacía (indentación)
+        # Columna 4 vacía (espacio)
+
+        if estado == "visto_presencial":
+            with c2:
+                texto = "✅ Resumen" if t["resumen_clase"] else "☐ Resumen"
+                if st.button(
+                    texto,
+                    key=f"res_{t['tema_id']}",
+                    use_container_width=True,
+                    help="Resumen construido en el pizarrón entre todos",
+                ):
+                    toggle_subactividad(grupo.id, t["tema_id"], "resumen_clase")
+                    st.rerun()
+
+        with c3:
+            texto = "✅ Tarea" if t["tarea_asignada"] else "☐ Tarea"
+            if st.button(
+                texto,
+                key=f"tar_{t['tema_id']}",
+                use_container_width=True,
+                help="Ya se encargó la tarea para que aborden el tema en casa",
+            ):
+                toggle_subactividad(grupo.id, t["tema_id"], "tarea_asignada")
+                st.rerun()
+
+    # Separación entre temas
+    st.markdown("<div style='margin-bottom:6px'></div>", unsafe_allow_html=True)
