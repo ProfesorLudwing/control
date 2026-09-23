@@ -9,6 +9,7 @@ from db import SessionLocal
 from models import Grupo, Tema, Progreso
 
 from exportar_html import generar_html
+from datetime import datetime
 
 # ============================================================
 # Configuración de la página
@@ -30,13 +31,14 @@ with st.expander("📥 Exportar vista para celular", expanded=False):
 
     if st.session_state.get("html_listo"):
         html_str = generar_html()
+
         st.download_button(
             label="⬇️ Descargar avance_vista.html",
             data=html_str,
-            file_name="avance_vista.html",
+            file_name=f"avance_{datetime.now().strftime('%Y-%m-%d')}.html",
             mime="text/html",
             key="btn_descargar_html",
-        )
+                        )
 # ============================================================
 # Helpers de base de datos
 # ============================================================
