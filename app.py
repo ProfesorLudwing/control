@@ -8,6 +8,7 @@ import streamlit as st
 from db import SessionLocal
 from models import Grupo, Tema, Progreso
 
+from exportar_html import generar_html
 
 # ============================================================
 # Configuración de la página
@@ -18,7 +19,24 @@ st.set_page_config(
     layout="wide",
 )
 
+# --- Botón de exportar HTML (vista móvil) ---
+with st.expander("📥 Exportar vista para celular", expanded=False):
+    st.caption(
+        "Genera un archivo HTML de solo lectura con el avance de los 4 grupos. "
+        "Ábrelo en el navegador del celular."
+    )
+    if st.button("Generar HTML", key="btn_generar_html"):
+        st.session_state["html_listo"] = True
 
+    if st.session_state.get("html_listo"):
+        html_str = generar_html()
+        st.download_button(
+            label="⬇️ Descargar avance_vista.html",
+            data=html_str,
+            file_name="avance_vista.html",
+            mime="text/html",
+            key="btn_descargar_html",
+        )
 # ============================================================
 # Helpers de base de datos
 # ============================================================
